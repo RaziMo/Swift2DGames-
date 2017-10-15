@@ -1,0 +1,34 @@
+//
+//  S2DGSound.swift
+//  Swift2DGames
+//
+//  Created by Razieh Moatamedi on 17/10/15.
+//  Copyright © 2015 Razieh Moatamedi. All rights reserved.
+//
+
+import AppKit
+
+///This class is used to add sound to game-objects.
+class S2DGSound {
+    var sound = NSSound?()
+    
+    init(fileName: String) {
+        sound = NSSound(contentsOfFile: fileName, byReference: true)
+    }
+    
+    /// Plays the sound once, initiate audio playback.
+    func start(){
+        sound?.play()
+    }
+    
+    /// Stops the sound, pause audio playback.
+    func stop() {
+        sound?.pause()
+    }
+    
+    /// Plays the sound in an audio playback.
+    func loop() {
+        sound?.resume()
+    }
+}
+
