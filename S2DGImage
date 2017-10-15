@@ -1,0 +1,62 @@
+//
+//  S2DGImage.swift
+//  Swift2DGames
+//
+//  Created by Razieh Moatamedi on 17/03/15.
+//  Copyright © 2015 Razieh Moatamedi. All rights reserved.
+//
+
+import AppKit
+
+///This class is for image handling and representation.
+class S2DGImage {
+    var image: NSImage?
+    
+    /**
+     Constructor that takes a String as a parameter.
+     - parameter fileName: The name of the image file.
+     */
+    func setImage(fileName: String) {
+        image = NSImage(named: fileName)
+    }
+    
+    /**
+     Constructor that takes another S2DGImage as a parameter.
+     - parameter image: The image of this object is set as the new image.
+     */
+    func setImage(image: S2DGImage)  {
+        self.image = image.image
+    }
+    
+    /**
+     Returns the image of this S2DGImage.
+     - returns: image.
+     */
+    func getS2DGImage() -> S2DGImage {
+        return self
+    }
+    
+    /**
+     Returns the image of this NSImage.
+     - returns: image.
+     */
+    func getImage() -> NSImage {
+        return image!
+    }
+    
+    /**
+     Returns the width of this S2DG objects BufferedImage in pixels.
+     - returns: the width of this S2DG objects BufferedImage in pixels.
+     */
+    func getWidth() -> Int {
+        return Int(image!.size.width)
+    }
+    
+    /**
+     Returns the height of this S2DG objects BufferedImage in pixels.
+     - returns: the height of this S2DG objects BufferedImage in pixels.
+     */
+    func getHeight() -> Int {
+        return Int(image!.size.height)
+    }
+}
