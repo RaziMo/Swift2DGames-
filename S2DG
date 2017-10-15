@@ -1,0 +1,658 @@
+//
+//  S2DG.swift
+//  Swift2DGames
+//
+//  Created by Razieh Moatamedi on 17/03/15.
+//  Copyright © 2015 Razieh Moatamedi. All rights reserved.
+//
+
+import AppKit
+
+/** The GameState is an enum that contains the three gamestates.
+ - PLAY
+ - PAUSED
+ - GAMEOVER
+ */
+enum GameState {
+    case  PLAYING, PAUSED, GAMEOVER
+}
+
+/**
+ This class creates a application window when instantiated, on which the game is drawn -
+ It is also the class that contains the `gameloop` responsible for updating
+ the game - All user input is also handled in this class by Key- and MouseEvents.
+ */
+class S2DG : NSWindow {
+    
+    /// Frames per second.
+    var fps: Double = 0
+    
+    /// The width of the frame in pixels.
+    var frameWidth: Int = 0
+    
+    /// The height of the frame in pixels.
+    var frameHeight: Int = 0
+    
+    /// The state is the GameState object that is responsible for the flow of the game.
+    var state = GameState.PLAYING
+    
+    /// The rate is waiting time between each game updates in milliseconds.
+    var rate: Double
+    
+    /// The world that is connected to the S2DG.
+    var world: World?
+    
+    /// A boolean indicating if this is the first time we start the game.
+    var started: Bool = false
+    
+    /// String that is representing the user-input when a key is pressed.
+    var keyStringP : String = ""
+    
+    /// String that is representing the user-input when a key is pressed.
+    var keyStringR : String = ""
+    
+    /// int where the keyevents keycode gets stored when pressed.
+    var keyP: Int = 0
+    
+    /// int where the keyevents keycode gets stored when released.
+    var keyR: Int = 0
+    
+    /// CGFloat where the mouseevents x gets stored when pressed.
+    var mousePX: CGFloat = 0
+    
+    /// CGFloat where the mouseevents y gets stored when pressed.
+    var mousePY: CGFloat = 0
+    
+    /// CGFloat where the mouseevents x gets stored when released.
+    var mouseRX: CGFloat = 0
+    
+    /// CGFloat where the mouseevents y gets stored when released.
+    var mouseRY: CGFloat = 0
+    
+    /// CGFloat where the mouseevents x gets stored when clicked.
+    var mouseCX: CGFloat = 0
+    
+    /// CGFloat where the mouseevents y gets stored when clicked.
+    var mouseCY: CGFloat = 0
+    
+    /// An NSThread object controls a thread of execution.
+    var gameThread = NSThread()
+    
+    /**
+     Array of booleans displays the state of each key of the keyboard - if a key is pressed the index-number is changed to true and when the key is released again, the index number changed back to false.
+     */
+    var keysDown = [Bool](count: 256, repeatedValue: false)
+    
+    /**
+     Array of booleans displays the state of each key of the keyboard. If a key is being released, the index-number relative to the keys ASCII code is changed to true and the next time that key is released the index number is change to false.
+     */
+    var keysToggled = [Bool](count: 256, repeatedValue: false)
+    
+    /// The NSApplication class provides the central framework for the app’s execution.
+    var application: NSApplication
+    var windowDelegate = WindowDelegate()
+    
+    /**
+     Constructor
+     
+     - parameters:
+     - fsp: The frame per second which is consisted of styleMask with Window displys Title, Close and minimize button
+     - frameSizex: the frame width in pixels.
+     - frameSizeY: the frame height in pixels.
+     */
+    init(fps: Double, frameSizeX: Int, frameSizeY: Int) {
+        /// game-loop fps
+        rate = 1.0 / fps * 1000000
+        let frame = NSMakeRect(CGFloat(0), CGFloat(0), CGFloat(frameSizeX), CGFloat(frameSizeY))
+        application = NSApplication.sharedApplication()
+        super.init(contentRect: frame,
+            styleMask: NSTitledWindowMask |
+                NSClosableWindowMask |
+            NSMiniaturizableWindowMask,
+            backing: .Buffered, `defer`: false)
+        delegate = windowDelegate
+        center()
+        makeKeyAndOrderFront(self)
+        application.setActivationPolicy(NSApplicationActivationPolicy.Regular)
+        
+        /// frame dimensions
+        if(frameSizeX > 0 && frameSizeY > 0) {
+            frameWidth = frameSizeX
+            frameHeight = frameSizeY
+            Swift.print("frame dimentions set")
+        } else {
+            frameWidth = 600
+            frameHeight = 400
+            Swift.print("frame dimentions must be positive default values are set")
+        }
+        
+        /// frame setup
+        if (fps < 100 && fps > 0) {
+            self.fps = fps
+            Swift.print("custom fps")
+        } else {
+            self.fps = 30
+            Swift.print("default fps")
+        }
+    }
+    
+    class WindowDelegate: NSObject, NSWindowDelegate {
+        func windowWillClose(notification: NSNotification) {
+            NSApplication.sharedApplication().terminate(0)
+        }
+    }
+    
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+    
+    /**
+     Returns the current state of the game-flow.
+     - return: the current state of the game-flow.
+     */
+    func getGameSate() -> GameState {
+        return state
+    }
+    
+    /**
+     Returns the width of the frame in pixels.
+     - return the width of the frame in pixels.
+     */
+    func getFrameWidth() -> Int {
+        return frameWidth
+    }
+    
+    /**
+     returns the height of the frame in pixels.
+     - return the height of the frame in pixels.
+     */
+    func getFrameHeight() -> Int {
+        return frameHeight
+    }
+    
+    private func setWorld(newWorld: World) {
+        world = newWorld
+        world!.setS2DG(self)
+    }
+    func setWorld1(newWorld: World) {
+        world = newWorld
+        world!.setS2DG(self)
+    }
+    /**
+     Returns the World that is connected to this S2DG.
+     - returns: the world that is connected to this S2DG.
+     */
+    func getWorld() -> World {
+        return world!
+    }
+    
+    /**
+     Calls the world getKeyPressed.
+     - parameter key: A String representation of the key that is pressed.
+     */
+    func getKeyPressed(key: String) {
+        world!.getKeyPressed(key)
+    }
+    
+    /**
+     Calls the world getKeyReleased.
+     - If the key is ESCAPE with PLAYING or PAUSED of GameState, pause()/play() is called.
+     - parameter key: A String display of the key that is being Released.
+     */
+    func getKeyReleased(key: String) {
+        if (key == "ESCAPE" && state == GameState.PLAYING) {
+            pause()
+        } else if (key == "ESCAPE" && state == GameState.PAUSED) {
+            play()
+        }
+        world!.getKeyReleased(key)
+    }
+    
+    /// GAMELOOP
+    
+    /// Pauses the game, freezing the `gameloop`.
+    func pause() {
+        state = GameState.PAUSED
+    }
+    
+    /// Activate the `gameloop`.
+    func play() {
+        state = GameState.PLAYING
+    }
+    
+    /**
+     Starts the game from its initial setting. If it is the first time the game is being run, the gameThread is started.
+     */
+    func startGame() {
+        if(!started) {
+            started = true
+            state = GameState.PLAYING
+            gameThread = NSThread(target: UpdateLoop(s2dg: self), selector: "run", object: nil)
+            gameThread.start()
+            application.run()
+        } else if (state == GameState.PAUSED) {
+            Swift.print("Playing")
+            state = GameState.PLAYING
+        } else {
+            state = GameState.PLAYING
+        }
+    }
+    
+    /// Clears the ArrayList. It contains the Actors of the world.
+    func restart() {
+        getWorld().clearActors()
+        self.initialize()
+    }
+    
+    func initialize() {
+    }
+    
+    class UpdateLoop : NSObject {
+        var s2dg: S2DG
+        
+        init(s2dg: S2DG){
+            self.s2dg = s2dg
+        }
+        
+        /// This is the game-loop that is responsible for updateWorld.
+        func run() {
+            while true {
+                Swift.print("run")
+                usleep(useconds_t(s2dg.rate))
+                if s2dg.world != nil &&  (s2dg.state == GameState.PLAYING){
+                    s2dg.world!.updateWorld()
+                }
+            }
+        }
+    }
+    
+    /// Advanced Key
+    
+    /**
+    This method handles a given keyboard event that may need to be interpreted as changing the key view or triggering a keyboard equivalent.
+    - Parameters: event, the keyboard event to process.
+    */
+    override func keyDown(theEvent: NSEvent) {
+        keyP = Int(theEvent.keyCode)
+        switch  keyP {
+        case 12:
+            keyStringP = "Q"
+        case 13:
+            keyStringP = "W"
+        case 14:
+            keyStringP = "E"
+        case 15:
+            keyStringP = "R"
+        case 17:
+            keyStringP = "T"
+        case 16:
+            keyStringP = "Y"
+        case 32:
+            keyStringP = "U"
+        case 34:
+            keyStringP = "I"
+        case 31:
+            keyStringP = "O"
+        case 35:
+            keyStringP = "P"
+        case 0:
+            keyStringP = "A"
+        case 1:
+            keyStringP = "S"
+        case 2:
+            keyStringP = "D"
+        case 3:
+            keyStringP = "F"
+        case 5:
+            keyStringP = "G"
+        case 4:
+            keyStringP = "H"
+        case 38:
+            keyStringP = "J"
+        case 40:
+            keyStringP = "K"
+        case 37:
+            keyStringP = "L"
+        case 6:
+            keyStringP = "Z"
+        case 7:
+            keyStringP = "X"
+        case 8:
+            keyStringP = "C"
+        case 9:
+            keyStringP = "V"
+        case 11:
+            keyStringP = "B"
+        case 45:
+            keyStringP = "N"
+        case 46:
+            keyStringP = "M"
+        case 126:
+            keyStringP = "UP"
+        case 125:
+            keyStringP = "DOWN"
+        case 123:
+            keyStringP = "RIGHT"
+        case 124:
+            keyStringP = "LEFT"
+        case 53:
+            keyStringP = "ESCAPE"
+        case 49:
+            keyStringP = "SPACE"
+        case 59:
+            keyStringP = "CONTROL"
+        case 58:
+            keyStringP = "ALT"
+        case 36:
+            keyStringP = "ENTER"
+            
+        default:
+            keyStringP = "NULL"
+        }
+        if keyStringP != "NULL" {
+            self.getKeyPressed(keyStringP)
+        }
+        keysDown[Int(theEvent.keyCode)] = true
+    }
+    
+    /**
+     This method informs the receiver that the user has released a key.
+     The default implementation simply passes this message to the next responder.
+     - Parameters: TheEvent, an object encapsulating information about the key-up event.
+     */
+    override func keyUp(theEvent: NSEvent ) {
+        keyR = Int(theEvent.keyCode)
+        switch keyR {
+        case 12:
+            keyStringR = "Q"
+        case 13:
+            keyStringR = "W"
+        case 14:
+            keyStringR = "E"
+        case 15:
+            keyStringR = "R"
+        case 17:
+            keyStringR = "T"
+        case 16:
+            keyStringR = "Y"
+        case 32:
+            keyStringR = "U"
+        case 34:
+            keyStringR = "I"
+        case 31:
+            keyStringR = "O"
+        case 35:
+            keyStringR = "P"
+        case 0:
+            keyStringR = "A"
+        case 1:
+            keyStringR = "S"
+        case 2:
+            keyStringR = "D"
+        case 3:
+            keyStringR = "F"
+        case 5:
+            keyStringR = "G"
+        case 4:
+            keyStringR = "H"
+        case 38:
+            keyStringR = "J"
+        case 40:
+            keyStringR = "K"
+        case 37:
+            keyStringR = "L"
+        case 6:
+            keyStringR = "Z"
+        case 7:
+            keyStringR = "X"
+        case 8:
+            keyStringR = "C"
+        case 9:
+            keyStringR = "V"
+        case 11:
+            keyStringR = "B"
+        case 45:
+            keyStringR = "N"
+        case 46:
+            keyStringR = "M"
+        case 126:
+            keyStringR = "UP"
+        case 125:
+            keyStringR = "DOWN"
+        case 123:
+            keyStringR = "RIGHT"
+        case 124:
+            keyStringR = "LEFT"
+        case 53:
+            keyStringR = "ESCAPE"
+        case 49:
+            keyStringR = "SPACE"
+        case 59:
+            keyStringR = "CONTROL"
+        case 58:
+            keyStringR = "ALT"
+        case 36:
+            keyStringR = "ENTER"
+        default:
+            keyStringR = "NULL"
+        }
+        if keyStringP != "NULL" {
+            self.getKeyReleased(keyStringR)
+            Swift.print(keyStringR)
+            keysDown[Int(theEvent.keyCode)] = false
+        }
+        if keysToggled[Int(theEvent.keyCode)] {
+            keysToggled[Int(theEvent.keyCode)] = false
+        } else {
+            keysToggled[Int(theEvent.keyCode)] = true
+        }
+    }
+    
+    /**
+     check if a key has been released
+     its boolean is true until the key has be released again. A Character will be received as an input, then is casting to an Int the ASCII code of this Character, this defines which key is being checked.
+     - parameter key: The Character that should be checked.
+     - returns: true. If the input Character is been released, meanwhile the key releases again, then the method return false.
+     */
+    func isKeyDown(key: Character) -> Bool {
+        if keysDown[Int(String(key))!] {
+            return true
+        } else {
+            return false
+        }
+    }
+    
+    /**
+     Checks if a key has been released, its boolean will be
+     true, until the key will be released again - The method receives a Character as input, and then is casting to an Int the ASCII code of this Character, will determine which key is being checked.
+     - parameter key: The character that should be checked.
+     - returns:  true if the input Character has been released, when the button is released again, the method will return false.
+     */
+    func isKeyToggled(key: Character) -> Bool {
+        if keysToggled[Int(String(key))!] {
+            return true
+        } else {
+            return false
+        }
+    }
+    
+    /**
+     This method checks if a key is being pressed.
+     - parameter key: A String representing the button you wish to check for.
+     All inputs must be written in caps letter, surrounded by "" like "ALT".
+     -  returns: true is the specified button is pressed, otherwise it returns false.
+     */
+    func isKeyDown(key: String) -> Bool {
+        if key == "UP" && keysDown[126] {
+            return true
+        } else if key == "DOWN" && keysDown[125] {
+            return true
+        } else if key == "LEFT" && keysDown[123] {
+            return true
+        } else if key == "RIGHT" && keysDown[124] {
+            return true
+        } else if key == "SPACE" && keysDown[49] {
+            return true
+        } else if key == "CONTROL" && keysDown[59] {
+            return true
+        } else if key == "ENTER" && keysDown[36] {
+            return true
+        } else if key == "ALT" && keysDown[58] {
+            return true
+        } else if key == "SHIFT" && keysDown[56] {
+            return true
+        } else if key == "ESCAPE" && keysDown[53] {
+            return true
+        } else if key == "F1" && keysDown[122] {
+            return true
+        } else if key == "F2" && keysDown[120] {
+            return true
+        } else if key == "F3" && keysDown[99] {
+            return true
+        } else if key == "F4" && keysDown[118] {
+            return true
+        } else if key == "F5" && keysDown[96] {
+            return true
+        } else if key == "F6" && keysDown[97] {
+            return true
+        } else if key == "F7" && keysDown[98] {
+            return true
+        } else if key == "F8" && keysDown[100] {
+            return true
+        } else if key == "F9" && keysDown[101] {
+            return true
+        } else if key == "F10" && keysDown[109] {
+            return true
+        } else if key == "F11" && keysDown[103] {
+            return true
+        } else if key == "F12" && keysDown[111] {
+            return true
+        } else if key == "Q" && keysDown[12] {
+            return true
+        } else if key == "W" && keysDown[13] {
+            return true
+        } else if key == "E" && keysDown[14] {
+            return true
+        } else if key == "R" && keysDown[15] {
+            return true
+        } else if key == "T" && keysDown[17] {
+            return true
+        } else if key == "Y" && keysDown[16] {
+            return true
+        } else if key == "U" && keysDown[32] {
+            return true
+        } else if key == "I" && keysDown[34] {
+            return true
+        } else if key == "O" && keysDown[31] {
+            return true
+        } else if key == "P" && keysDown[35] {
+            return true
+        } else if key == "A" && keysDown[0] {
+            return true
+        } else if key == "S" && keysDown[1] {
+            return true
+        } else if key == "D" && keysDown[2] {
+            return true
+        } else if key == "F" && keysDown[3] {
+            return true
+        } else if key == "G" && keysDown[5] {
+            return true
+        } else if key == "H" && keysDown[4] {
+            return true
+        } else if key == "J" && keysDown[38] {
+            return true
+        } else if key == "K" && keysDown[40] {
+            return true
+        } else if key == "L" && keysDown[37] {
+            return true
+        } else if key == "Z" && keysDown[6] {
+            return true
+        } else if key == "X" && keysDown[7] {
+            return true
+        } else if key == "C" && keysDown[8] {
+            return true
+        } else if key == "V" && keysDown[9] {
+            return true
+        } else if key == "B" && keysDown[11] {
+            return true
+        } else if key == "N" && keysDown[45] {
+            return true
+        } else if key == "M" && keysDown[46] {
+            return true
+        } else {
+            return false
+        }
+    }
+    
+    /// Mouse Events Handling
+    
+    /**
+    Calls the getMousePressed of the world, passing the x and y positions of the mouse.
+    - parameter mousePX: x position when mouse is pressed.
+    - parameter mousePY: y position when mouse is pressed.
+    */
+    func getMousePressed(mousePX: CGFloat, mousePY: CGFloat) {
+        world!.getMousePressed(mousePX, mousePY: mousePY)
+    }
+    
+    
+    /**
+     Calls the getMouseReleased of the world, passing the x and y positions of the mouse.
+     - parameter mouseRX: x position when mouse is Released.
+     - parameter mouseRY: y position when mouse is Released.
+     */
+    func getMouseReleased(mouseRX: CGFloat, mouseRY: CGFloat) {
+        world!.getMouseReleased(mouseRX, mouseRY: mouseRY)
+    }
+    
+    /**
+     Calls the getMouseClicked of the world, passing the x and y positions of the mouse.
+     - parameter mouseCX: x position when mouse is clicked.
+     - parameter mouseCY: y position when mouse is clicked.
+     */
+    func getMouseClicked(mouseCX: CGFloat, mouseCY: CGFloat) {
+        world!.getMouseClicked(mouseCX, mouseCY: mouseCY)
+    }
+    
+    /// Mouse Listener
+    
+    /**
+    Informs the receiver that the cursor has entered a tracking rectangle.
+    The default implementation simply passes this message to the next responder.
+    - Parameters: TheEvent, an object encapsulating information about the mouse-entered event.
+    */
+    override func mouseEntered(theEvent: NSEvent) {
+    }
+    
+    /**
+     Informs the receiver that the cursor has exited a tracking rectangle.
+     The default implementation simply passes this message to the next responder.
+     - Parameters: TheEvent, an object encapsulating information about the mouse-exited event.
+     */
+    override func mouseExited(theEvent: NSEvent) {
+    }
+    
+    /**
+     Informs the receiver that the user has pressed the left mouse button.
+     The default implementation simply passes this message to the next responder.
+     Parameters
+     theEvent
+     An object encapsulating information about the mouse-down event.
+     */
+    override func mouseDown(theEvent: NSEvent) {
+        mousePX = theEvent.deltaX
+        mousePY = theEvent.deltaY
+        self.getMousePressed(mousePX, mousePY: mousePY)
+    }
+    
+    /**
+     Informs the receiver that the user has released the left mouse button.
+     The default implementation simply passes this message to the next responder.
+     - Parameters: TheEvent, an object encapsulating information about the mouse-up event.
+     */
+    override func mouseUp(theEvent: NSEvent) {
+        mouseRX = theEvent.deltaX
+        mouseRY = theEvent.deltaY
+        self.getMouseReleased(mouseRX, mouseRY: mouseRY)
+    }
+}
