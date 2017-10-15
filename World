@@ -158,7 +158,6 @@ class World : NSView {
         imageView!.image = NSImage(byReferencingFile: fileName)
         imageView!.imageScaling = NSImageScaling.ScaleAxesIndependently
         addSubview(imageView!)
-        Swift.print(image.getWidth())
     }
     
     /**
